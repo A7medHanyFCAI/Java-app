@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven3'      
-        jdk 'Java21'        
+        maven 'Maven3'      // Maven tool configured in Jenkins
+        jdk 'Java21'        // JDK tool configured in Jenkins
     }
 
     environment {
         IMAGE_NAME = "java-app"
-        DOCKER_HUB_USER = "ahmedhany28" 
+        DOCKER_HUB_USER = "ahmedhany28"
     }
 
     stages {
@@ -39,14 +39,20 @@ pipeline {
         }
 
         stage('Docker Push') {
+            when {
+                expression { env.BUILD_NUMBER.toInteger() >= 5 }
+            }
             steps {
-                echo 'Pushing Docker image to Docker Hub...'
-                withCredentials([string(credentialsId: 'dockerhub-pass', variable: 'DOCKERHUB_TOKEN')]) {
-                    sh """
-                        echo "$DOCKERHUB_TOKEN" | docker login -u ${DOCKER_HUB_USER} --password-stdin
-                        docker tag ${IMAGE_NAME}:${BUILD_NUMBER} ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER}
-                        docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:${BUILD_NUMBER}
-                    """
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "Logging into Docker Hub..."
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        echo "Tagging image..."
+                        docker tag ${IMAGE_NAME}:${BUILD_NUMBER} $DOCKER_USER/${IMAGE_NAME}:${BUILD_NUMBER}
+                        echo "Pushing image to Docker Hub..."
+                        docker push $DOCKER_USER/${IMAGE_NAME}:${BUILD_NUMBER}
+                        docker logout
+                    '''
                 }
             }
         }
@@ -69,11 +75,11 @@ pipeline {
         }
 
         success {
-            echo 'SUCCESS'
+            echo 'Build SUCCESS!'
         }
 
         failure {
-            echo 'FAILED'
+            echo 'Build FAILED.'
         }
     }
 }
